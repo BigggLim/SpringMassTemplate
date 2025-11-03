@@ -46,7 +46,7 @@ public class BParticleSimMesh : MonoBehaviour
     public float defaultSpringKS = 100.0f;      // default spring coefficient with default 100
     public float defaultSpringKD = 1.0f;        // default spring daming coefficient with default 1
 
-    public bool debugRender = false;            // To render or not to render
+    public bool debugRender = true;            // To render or not to render
 
 
     /*** 
@@ -62,8 +62,14 @@ public class BParticleSimMesh : MonoBehaviour
      * - array of particles (BParticle[])
      * - the plane (BPlane)
      ***/
-
-
+    public Transform groundPlaneTransform;
+    public bool handlePlaneCollisions = true;
+    public float particleMass = 1.0f;
+    public bool useGravity = true;
+    public Vector3 gravity = new Vector3(0.0f, -9.8f, 0.0f);
+    private Mesh mesh;
+    private BParticle[] particles;
+    private BPlane groundPlane;
 
     /// <summary>
     /// Init everything
@@ -80,8 +86,9 @@ public class BParticleSimMesh : MonoBehaviour
     ///         generated between particles. 
     /// </summary>
     void Start()
-    {
-
+    { 
+        InitParticles();
+        InitPlane();
     }
 
 
@@ -94,6 +101,64 @@ public class BParticleSimMesh : MonoBehaviour
      * ...
      ***/
 
+     public void InitParticles()
+    {
+        mesh = GetComponent<MeshFilter>().mesh;
+        Vector3[] vertices = mesh.vertices;
+        int vertexCount = vertices.Length;
+
+        particles = new BParticle[vertexCount];
+
+        for (int i = 0; i < vertexCount; i++)
+        {
+            particles[i].position = transform.TransformPoint(vertices[i]);
+            particles[i].velocity = Vector3.zero;
+            particles[i].mass = particleMass;
+            particles[i].attachedSprings = new List<BSpring>();
+
+            for (int j = 0; j < vertexCount; j++)
+            {
+                if (i != j)
+                {
+                    BSpring spring = new BSpring();
+                    spring.ks = defaultSpringKS;
+                    spring.kd = defaultSpringKD;
+                    spring.restLength = Vector3.Distance(particles[i].position, particles[j].position);
+                    spring.attachedParticle = j;
+
+                    particles[i].attachedSprings.Add(spring);
+                }
+            }
+            particles[i].currentForces = gravity * particles[i].mass;
+        }
+        
+    }
+    public void InitPlane()
+    {
+        groundPlane.position = groundPlaneTransform.position;
+        groundPlane.normal = groundPlaneTransform.up;
+    }
+
+    public void UpdateMesh()
+    {
+        Vector3[] vertices = new Vector3[particles.Length];
+
+        for (int i = 0; i < particles.Length; i++)
+        {
+            vertices[i] = transform.InverseTransformPoint(particles[i].position);
+        }
+
+        mesh.vertices = vertices;
+        mesh.RecalculateNormals();
+    }
+    public void ResetParticleForces()
+    {
+        for (int i = 0; i < particles.Length; i++)
+        {
+            particles[i].currentForces = Vector3.zero;
+        }
+    }
+
 
 
     /// <summary>
@@ -101,7 +166,7 @@ public class BParticleSimMesh : MonoBehaviour
     /// </summary>
     public void Update()
     {
-        /* This will work if you have a correctly made particles array
+        /* This will work if you have a correctly made particles array*/
         if (debugRender)
         {
             int particleCount = particles.Length;
@@ -116,6 +181,9 @@ public class BParticleSimMesh : MonoBehaviour
                 }
             }
         }
-        */
+
+        ResetParticleForces();
+        UpdateMesh();
+        
     }
 }
